@@ -65,9 +65,19 @@ app.post('/rpc/:endpoint', async (req, res) => {
         });
         res.json(response.data);
     } catch (error) {
+        console.error("Error details:", error);  // Log the complete error details
+
         if (error.code === 'ECONNABORTED') {
             res.status(504).json({ error: 'Request timed out' }); // 504 Gateway Timeout
+        } else if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            res.status(500).json({ error: `Received response with status code: ${error.response.status}` });
+        } else if (error.request) {
+            // The request was made but no response was received
+            res.status(500).json({ error: 'No response received from destination RPC' });
         } else {
+            // Something happened in setting up the request that triggered an Error
             res.status(500).json({ error: 'Failed to relay request' });
         }
     }
