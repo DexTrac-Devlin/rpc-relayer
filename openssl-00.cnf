@@ -1,0 +1,22 @@
+[ req ]
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+
+[ req_distinguished_name ]
+countryName                 = Country Name (2 letter code)
+countryName_default         = US
+stateOrProvinceName         = State or Province Name (full name)
+stateOrProvinceName_default = Your State
+localityName                = Locality Name (eg, city)
+localityName_default        = Your City
+organizationName            = Organization Name (eg, company)
+organizationName_default    = Your Company
+commonName                  = Common Name (e.g. server FQDN or YOUR name)
+commonName_default          = $YOUR_IP_ADDRESS
+commonName_max              = 64
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1   = $YOUR_IP_ADDRESS

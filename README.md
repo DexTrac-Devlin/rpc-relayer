@@ -25,6 +25,8 @@ This is designed to provide an endpoint that will relay all RPC messages it rece
 3. Import cert and key for HTTPS, or generate a self-signed certificate
 Example for self-signed cert:
 
+_Be sure to update the provided openssl-00.cnf file._
+
 `openssl req -newkey rsa:4096 -x509 -sha256 -days 365 -nodes -out tls/cert.pem -keyout tls/key.pem -config openssl-00.cnf -extensions req_ext`
 
 4. Update the index.js:
