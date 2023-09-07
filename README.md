@@ -47,7 +47,7 @@ _Be sure to update the provided openssl-00.cnf file._
 `docker build -t rpc-relayer .`
 
 6. Run the contianer:
-`docker run  --name rpc-relayer  -p 4000:4000  -d`
+`docker run --name rpc-relayer -p 4000:4000 -d rpc-relayer`
 
 ---
 
