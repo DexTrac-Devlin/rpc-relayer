@@ -57,11 +57,11 @@ The below examples are using the temporary values in the default index.js.
 
 #### Your endpoint will be available at:
 
-`https://your-relay-dns-or-ip:4000/rpc/rpc-endpoint-00`
+`https://your-relay-dns-or-ip:4000/rpc/rpc-endpoint-00?apiKey=AUTH_KEY_CHANGE_ME`
 
 and
 
-`https://your-relay-dns-or-ip:4000/rpc/rpc-endpoint-01`
+`https://your-relay-dns-or-ip:4000/rpc/rpc-endpoint-01?apiKey=AUTH_KEY_CHANGE_ME`
 
 #### Which will forward all inbound requests to:
 
