@@ -47,16 +47,29 @@ axios.interceptors.response.use(response => {
     return Promise.reject(error);
 });
 
+// Adjust the below line to change the HTTP timeout.
+// Default is 20,000 miliseconds, or 20 seconds
+const RELAYER_HTTP_TIMEOUT = 20000;
+
 app.post('/rpc/:endpoint', async (req, res) => {
-    const endpointUrl = RPC_ENDPOINTS[req.params.endpoint];
-    if (!endpointUrl) {
-        return res.status(400).json({ error: 'Unknown RPC endpoint' });
+    const endpoint = req.params.endpoint;
+    const destinationUrl = RPC_ENDPOINTS[endpoint];
+
+    if (!destinationUrl) {
+        return res.status(400).json({ error: `Unsupported RPC endpoint: ${endpoint}` });
     }
+
     try {
-        const response = await axios.post(endpointUrl, req.body);
+        const response = await axios.post(destinationUrl, req.body, {
+            timeout: RELAYER_HTTP_TIMEOUT
+        });
         res.json(response.data);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to relay request' });
+        if (error.code === 'ECONNABORTED') {
+            res.status(504).json({ error: 'Request timed out' }); // 504 Gateway Timeout
+        } else {
+            res.status(500).json({ error: 'Failed to relay request' });
+        }
     }
 });
 

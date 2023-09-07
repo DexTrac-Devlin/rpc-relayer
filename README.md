@@ -42,6 +42,10 @@ _Be sure to update the provided openssl-00.cnf file._
     * `'rpc-endpoint-00': 'https://remote-rpc-endpoint-00/',`
     * `'rpc-endpoint-01': 'https://remote-rpc-endpoint-01/',`
 
+* You can also adjust the timeout of the rpc relayer
+
+    * `const RELAYER_HTTP_TIMEOUT = 20000;`
+
 5. Build the contianer image:
 
 `docker build -t rpc-relayer .`
