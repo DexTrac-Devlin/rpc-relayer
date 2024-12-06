@@ -2,95 +2,100 @@ const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
-const morgan = require('morgan');
+const WebSocket = require('ws');
 
 const app = express();
-// Update the below line to change the listening port.
-// Be sure to adjust your docker run command to publish the port.
-const PORT = 4000;
-// Adjust the below value to change your authentication key
+const PORT_HTTP = 4001; // For HTTP and WS
+const PORT_HTTPS = 4000; // For HTTPS and WSS
 const AUTHENTICATION_KEY = 'AUTH_KEY_CHANGE_ME';
 
 const RPC_ENDPOINTS = {
-  // Update the below to configure the relayer URL path and the destination RPC endpoint
-  // Example:
-  // 'url-path': 'remote-rpc-endpoint'
   'rpc-endpoint-00': 'https://remote-rpc-endpoint-00/',
-  'rpc-endpoint-01': 'https://remote-rpc-endpoint-01/',
-  // ... add other endpoints as needed
+};
+
+const WS_RPC_ENDPOINTS = {
+  'ws-endpoint-00': 'wss://remote-ws-endpoint-00/',
 };
 
 const authenticate = (req, res, next) => {
-    const apiKey = req.query.apiKey;
-    if (!apiKey || apiKey !== AUTHENTICATION_KEY) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-    next();
+  const apiKey = req.query.apiKey;
+  if (!apiKey || apiKey !== AUTHENTICATION_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
 };
 
-app.use(morgan('combined'));
 app.use(bodyParser.json());
 app.use(authenticate);
 
-// Add Axios interceptors for logging
-axios.interceptors.request.use(request => {
-    console.log('Starting Request', request);
-    return request;
-});
-
-axios.interceptors.response.use(response => {
-    console.log('Response:', response);
-    return response;
-}, error => {
-    console.log('Error:', error);
-    return Promise.reject(error);
-});
-
-// Adjust the below line to change the HTTP timeout.
-// Default is 20,000 miliseconds, or 20 seconds
-const RELAYER_HTTP_TIMEOUT = 20000;
-
+// HTTP and HTTPS endpoints for HTTP RPC
 app.post('/rpc/:endpoint', async (req, res) => {
-    const endpoint = req.params.endpoint;
-    const destinationUrl = RPC_ENDPOINTS[endpoint];
+  const endpoint = req.params.endpoint;
+  const destinationUrl = RPC_ENDPOINTS[endpoint];
 
-    if (!destinationUrl) {
-        return res.status(400).json({ error: `Unsupported RPC endpoint: ${endpoint}` });
-    }
+  if (!destinationUrl) {
+    return res.status(400).json({ error: `Unsupported RPC endpoint: ${endpoint}` });
+  }
 
-    try {
-        const response = await axios.post(destinationUrl, req.body, {
-            timeout: RELAYER_HTTP_TIMEOUT
-        });
-        res.json(response.data);
-    } catch (error) {
-        console.error("Error details:", error);  // Log the complete error details
-
-        if (error.code === 'ECONNABORTED') {
-            res.status(504).json({ error: 'Request timed out' }); // 504 Gateway Timeout
-        } else if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            res.status(500).json({ error: `Received response with status code: ${error.response.status}` });
-        } else if (error.request) {
-            // The request was made but no response was received
-            res.status(500).json({ error: 'No response received from destination RPC' });
-        } else {
-            // Something happened in setting up the request that triggered an Error
-            res.status(500).json({ error: 'Failed to relay request' });
-        }
-    }
+  try {
+    const response = await axios.post(destinationUrl, req.body, { timeout: 20000 });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Failed to relay request' });
+  }
 });
 
-// Load your HTTPS certificate and private key
+// HTTP Server
+const httpServer = http.createServer(app);
+
+// HTTPS Server
 const privateKey = fs.readFileSync('key.pem', 'utf8');
 const certificate = fs.readFileSync('cert.pem', 'utf8');
 const credentials = { key: privateKey, cert: certificate };
-
-// Create an HTTPS service identical to the HTTP service using the Express app instance
 const httpsServer = https.createServer(credentials, app);
 
-httpsServer.listen(PORT, () => {
-    console.log(`RPC relay server is running securely on port ${PORT}`);
+// WebSocket Servers
+const wsServer = new WebSocket.Server({ server: httpServer });
+const wssServer = new WebSocket.Server({ server: httpsServer });
+
+const handleWebSocketConnection = (socket, secure) => {
+  console.log(`WebSocket connection established (${secure ? 'wss' : 'ws'}).`);
+
+  socket.on('message', async (message) => {
+    try {
+      const { endpoint, payload } = JSON.parse(message);
+
+      if (!WS_RPC_ENDPOINTS[endpoint]) {
+        socket.send(JSON.stringify({ error: `Unsupported WebSocket RPC endpoint: ${endpoint}` }));
+        return;
+      }
+
+      const destinationSocket = new WebSocket(WS_RPC_ENDPOINTS[endpoint]);
+      destinationSocket.on('open', () => destinationSocket.send(JSON.stringify(payload)));
+      destinationSocket.on('message', (data) => socket.send(data));
+      destinationSocket.on('error', (err) => socket.send(JSON.stringify({ error: err.message })));
+    } catch (error) {
+      console.error('WebSocket error:', error);
+      socket.send(JSON.stringify({ error: 'Failed to process WebSocket message' }));
+    }
+  });
+
+  socket.on('close', () => {
+    console.log(`WebSocket connection closed (${secure ? 'wss' : 'ws'}).`);
+  });
+};
+
+wsServer.on('connection', (socket) => handleWebSocketConnection(socket, false));
+wssServer.on('connection', (socket) => handleWebSocketConnection(socket, true));
+
+// Start servers
+httpServer.listen(PORT_HTTP, () => {
+  console.log(`HTTP and WS server listening on port ${PORT_HTTP}`);
+});
+
+httpsServer.listen(PORT_HTTPS, () => {
+  console.log(`HTTPS and WSS server listening on port ${PORT_HTTPS}`);
 });
